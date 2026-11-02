@@ -159,6 +159,11 @@ private struct QuotaForecastDiagnosticsPayload: Encodable {
 }
 
 private struct ForecastWindowSummary: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case weeklyStartDate, elapsedWindowSeconds
+        case resetDate = "weeklyResetDate"
+        case windowMinutes = "weeklyWindowMinutes"
+    }
     let weeklyStartDate: Date
     let resetDate: Date
     let windowMinutes: Int
@@ -174,6 +179,11 @@ private struct ForecastSampleSummary: Encodable {
 }
 
 private struct ForecastDisplaySummary: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case currentUsedPercent = "currentWeeklyUsedPercent"
+        case fallbackProjectedWeeklyUsedPercentAtReset, displayedLowProjectedWeeklyUsedPercentAtReset
+        case displayedHighProjectedWeeklyUsedPercentAtReset, paceState
+    }
     let currentUsedPercent: Double
     let fallbackProjectedWeeklyUsedPercentAtReset: Double?
     let displayedLowProjectedWeeklyUsedPercentAtReset: Double?

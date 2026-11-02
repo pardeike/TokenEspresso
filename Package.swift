@@ -5,11 +5,13 @@ let package = Package(
     name: "TokenEspresso",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
+        .executable(name: "quota-forecast", targets: ["QuotaForecastCLI"]),
         .library(name: "TokenEspresso", targets: ["TokenEspresso"]),
         .library(name: "TokenEspressoProviders", targets: ["TokenEspressoProviders"]),
         .library(name: "TokenEspressoUI", targets: ["TokenEspressoUI"]),
     ],
     targets: [
+        .executableTarget(name: "QuotaForecastCLI", dependencies: ["TokenEspresso"]),
         .target(name: "TokenEspresso"),
         .target(name: "TokenEspressoProviders", dependencies: ["TokenEspresso"]),
         .target(name: "TokenEspressoUI", dependencies: ["TokenEspresso"]),

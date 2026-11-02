@@ -20,7 +20,7 @@ In a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/pardeike/TokenEspresso.git", from: "0.1.0"),
+    .package(url: "https://github.com/pardeike/TokenEspresso.git", from: "1.0.0"),
 ],
 targets: [
     .target(
@@ -315,7 +315,7 @@ If you fetch the usage JSON yourself, `ClaudeUsageReading.decode(_:)` lives in t
 
 ### HTTP transport
 
-Both clients talk through the `UsageHTTPClient` protocol, which has one method. `EphemeralUsageHTTPClient` is the default: no cookies, no cache, no redirects, a 128 KB response cap and 20 second timeouts. `URLSessionUsageHTTPClient(session:)` wraps a session you configure. Implementing the protocol yourself is the easiest way to mock responses in tests.
+Both clients talk through the `UsageHTTPClient` protocol, which has one method. `EphemeralUsageHTTPClient` is the default: no cookies, no cache, no redirects, a 128 KB response cap, a 20 second request timeout and a 30 second resource timeout. `URLSessionUsageHTTPClient(session:)` wraps a session you configure. Implementing the protocol yourself is the easiest way to mock responses in tests.
 
 ## SwiftUI views
 
@@ -341,6 +341,15 @@ UsagePredictionView(
 Pass `accent` from your app's accent color. It tints the title and the history line. Pass `prediction` when you already computed one so the view does not recompute it. When `status` is nil and the evidence says `.staleHistory`, the footer reads "Stale history".
 
 For long histories, `UsageHistorySampler.displaySamples(from:)` thins the samples to at most 480 points while keeping the first and last.
+
+## Command line
+
+The package also includes `quota-forecast` for forecasting a cumulative series from JSON:
+
+```sh
+swift run quota-forecast --input Examples/observed.json --output forecast.json
+swift run quota-forecast --help
+```
 
 ## Development
 

@@ -22,8 +22,8 @@ public struct UsagePredictionView: View {
         self.title = title
         self.provider = provider
         self.snapshot = snapshot
-        self.samples = samples
         let prediction = prediction ?? UsagePredictionEngine.evaluate(snapshot: snapshot, samples: samples, now: now)
+        self.samples = prediction.samples
         self.projection = prediction.projection
         self.now = now
         self.kind = style

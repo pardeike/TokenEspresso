@@ -52,8 +52,15 @@ public enum UsagePredictionEngine {
             projectedUsedPercentAtReset: nil, resetDate: snapshot?.secondary?.resetDate,
             windowStartDate: nil, paceState: current >= 100 ? .slowDown : .noData)
         let displayed = policy == .display ? QuotaProjectionEngine.make(snapshot: snapshot, samples: samples, now: now) : empty
+        let displayedSamples: [QuotaSample]
+        if policy == .display, let snapshot, let window = snapshot.secondary,
+           let reset = window.resetDate, let minutes = window.windowDurationMins, minutes > 0 {
+            displayedSamples = QuotaProjectionEngine.currentWindowSamples(snapshot: snapshot,
+                startDate: reset.addingTimeInterval(-Double(minutes) * 60), resetDate: reset, now: now, samples: samples)
+        } else { displayedSamples = [] }
         func result(_ projection: QuotaProjection = empty, _ selected: [QuotaSample] = []) -> UsagePrediction {
-            UsagePrediction(projection: policy == .display ? displayed : projection, evidence: evidence, samples: selected)
+            UsagePrediction(projection: policy == .display ? displayed : projection, evidence: evidence,
+                samples: policy == .display ? displayedSamples : selected)
         }
         guard let snapshot, let window = snapshot.secondary,
               let reset = window.resetDate, reset > now,

@@ -1267,6 +1267,10 @@ private struct ForecastPoint {
 }
 
 private struct QuotaForecastKitEncodedSample: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case date, offsetSeconds
+        case usedPercent = "weeklyUsedPercent"
+    }
     let date: Date
     let offsetSeconds: Double
     let usedPercent: Double

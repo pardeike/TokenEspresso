@@ -1,6 +1,6 @@
 import Foundation
 
-/// TokenCoffee's read-only history matching contract, also vendored by BrrainzTools.
+/// Shared identity and reset-matching rules for history consumers.
 /// No credentials, filesystem access or app dependencies belong here.
 public enum UsageHistoryContract {
     public static let version = 1
