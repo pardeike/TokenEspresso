@@ -161,6 +161,8 @@ let filename = UsageHistoryKeys.historyFilename(scope: "general")   // "<sha256>
 let zone = UsageHistoryKeys.cloudZone(accountKey: accountKey, scope: "general")
 ```
 
+The provider, identity and scope strings are hashed byte for byte. They are case-sensitive, and every writer and reader of the same history must pass them identically. The package does not normalize case or guess a provider's naming convention, because a silent rewrite would split one account's history into two.
+
 You choose the root directory, the account registry and any cloud container. Credentials never belong in history files.
 
 ## Predicting
@@ -173,11 +175,11 @@ You choose the root directory, the account registry and any cloud container. Cre
 
 ### Two policies
 
-`.display` is the default. It always returns something drawable. Until the window shows an increase, it falls back to a simple pace estimate from the readings so far. As soon as usage has risen inside the window, the pattern engine produces an optimistic and a pessimistic path. The evidence still reports `.insufficientHistory` while the trail is short, so the UI can say "collecting history" next to a provisional line. Use it for charts and cards.
+`.display` is the default. It always returns something drawable. When the window's readings give the pattern engine enough to work with, the projection carries a provisional optimistic and pessimistic path. When they do not, it falls back to a linear pace estimate from the readings so far. Either way, `evidence` reports independently. It can say `.insufficientHistory` or `.staleHistory` next to a line that is still drawn, so a card can show the line and label it "collecting history". Use it for charts and cards.
 
-`.verifiedReporting` returns a forecast only when the evidence passes. Samples must match the snapshot's limit id, window length, reset time and plan. There must be at least three of them spanning at least an hour. The latest must be at most 30 minutes old. Usage must be nondecreasing and must not exceed the live value. Otherwise the projection carries no estimate and `evidence.reason` names the gap. Use it when a number will be acted on, logged or reported, and a confident wrong answer is worse than none.
+`.verifiedReporting` suppresses estimates the evidence does not support. Samples must match the snapshot's limit id, window length, reset time and plan. There must be at least three of them spanning at least an hour. The latest must be at most 30 minutes old. Usage must be nondecreasing and must not exceed the live value. If any check fails, the projection carries no estimate and `evidence.reason` names the gap. Use it when a number will be acted on, logged or reported, and a confident wrong answer is worse than none.
 
-Both policies run the same pattern engine. They differ only in what they are willing to say when evidence is thin.
+Both policies run the same pattern engine. `.display` adds the linear fallback. `.verifiedReporting` adds the gate. In `UsagePredictionView`, a `status` you pass always wins over the evidence-derived footer text.
 
 | `evidence.status` | Meaning |
 | --- | --- |
@@ -221,7 +223,7 @@ if let forecast = prediction.projection.cycleRunForecast {
 
 ## Provider clients
 
-`TokenEspressoProviders` contains clients for two usage endpoints. Both need an OAuth client identifier that you register with the provider. The package does not ship one, and using these clients implies no endorsement by either provider.
+`TokenEspressoProviders` contains clients for two usage endpoints. Both take caller-supplied provider configuration, including the client identifier. The package ships no identifier, registers no client and grants no provider access. Those are yours to arrange.
 
 Both clients are plain structs with explicit async methods. Nothing runs until you call it. You own credential storage, you decide when to refresh, and you make sure only one refresh per grant is in flight at a time.
 
@@ -230,6 +232,7 @@ Both clients are plain structs with explicit async methods. Nothing runs until y
 Sign-in uses the device-code flow. Credentials go through a `CodexCredentialStore` that you supply. A Keychain implementation is included.
 
 ```swift
+import TokenEspresso
 import TokenEspressoProviders
 
 let configuration = CodexConfiguration(clientID: "<your client id>")
@@ -237,20 +240,22 @@ let http = EphemeralUsageHTTPClient()
 let store = KeychainCodexCredentialStore(service: "com.example.myapp.codex")
 let auth = CodexAuthentication(configuration: configuration, httpClient: http, tokenStore: store)
 
-// First run: show the code, wait for the user.
-let device = try await auth.requestDeviceCode()
-print("Open \(device.verificationURL) and enter \(device.userCode)")
-let credentials = try await auth.completeDeviceCodeLogin(device)   // polls, then saves to the store
-
-// Later runs: reuse what is stored, refresh if it is old.
-guard let tokens = try await auth.validTokens(refreshIfNeeded: true) else {
-    // nothing stored, start sign-in again
-    return
+/// First run. Show the code, then wait for the user to finish in the browser.
+func signIn() async throws -> CodexCredentials {
+    let device = try await auth.requestDeviceCode()
+    print("Open \(device.verificationURL) and enter \(device.userCode)")
+    return try await auth.completeDeviceCodeLogin(device)   // polls, then saves to the store
 }
 
-let usage = CodexUsageClient(configuration: configuration, httpClient: http)
-let response = try await usage.fetchRateLimits(tokens: tokens)
-let snapshot = response.codexSnapshot
+/// Later runs. Reuse stored credentials and refresh them when they are old.
+func fetchSnapshot() async throws -> RateLimitSnapshot {
+    guard let tokens = try await auth.validTokens(refreshIfNeeded: true) else {
+        throw CodexAuthenticationError.needsSignIn
+    }
+    let usage = CodexUsageClient(configuration: configuration, httpClient: http)
+    let response = try await usage.fetchRateLimits(tokens: tokens)
+    return response.codexSnapshot
+}
 ```
 
 `response.rateLimitsByLimitId` holds additional metered features when the account has them. `auth.accountSnapshot(for:)` reads the email and plan from the ID token for display. `auth.logout()` deletes the stored credentials.
