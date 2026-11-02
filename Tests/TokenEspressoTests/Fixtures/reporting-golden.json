@@ -1,0 +1,93 @@
+{
+  "duplicate-second" : {
+    "accountMatch" : "unverified",
+    "historyContractVersion" : 1,
+    "historySource" : "tokencoffee",
+    "historySpanSeconds" : 86400,
+    "lastSuccessfulSyncAt" : "2027-01-15T08:00:00Z",
+    "latestSampleAt" : "2027-01-15T08:00:00Z",
+    "method" : "tokencoffee-e1b47ee-v3",
+    "newestStoredSampleAt" : "2027-01-15T08:00:00Z",
+    "optimistic" : {
+      "reaches100At" : "2027-01-16T14:00:00Z",
+      "usedPercentAtReset" : 184
+    },
+    "pessimistic" : {
+      "reaches100At" : "2027-01-16T14:00:00Z",
+      "usedPercentAtReset" : 184
+    },
+    "recentRatePercentPointsPerHour" : 1,
+    "recentRateSpanSeconds" : 3600,
+    "rejectedSampleCount" : 0,
+    "sampleCount" : 49,
+    "status" : "ok",
+    "syncCaughtUp" : true
+  },
+  "exhausted" : {
+    "accountMatch" : "unverified",
+    "historyContractVersion" : 1,
+    "historySource" : "tokencoffee",
+    "method" : "tokencoffee-e1b47ee-v3",
+    "optimistic" : {
+      "reaches100At" : "2027-01-15T08:00:00Z",
+      "usedPercentAtReset" : 100
+    },
+    "pessimistic" : {
+      "reaches100At" : "2027-01-15T08:00:00Z",
+      "usedPercentAtReset" : 100
+    },
+    "status" : "exhausted"
+  },
+  "ordinary" : {
+    "accountMatch" : "unverified",
+    "historyContractVersion" : 1,
+    "historySource" : "tokencoffee",
+    "historySpanSeconds" : 86400,
+    "lastSuccessfulSyncAt" : "2027-01-15T08:00:00Z",
+    "latestSampleAt" : "2027-01-15T08:00:00Z",
+    "method" : "tokencoffee-e1b47ee-v3",
+    "newestStoredSampleAt" : "2027-01-15T08:00:00Z",
+    "optimistic" : {
+      "reaches100At" : "2027-01-16T14:00:00Z",
+      "usedPercentAtReset" : 184
+    },
+    "pessimistic" : {
+      "reaches100At" : "2027-01-16T14:00:00Z",
+      "usedPercentAtReset" : 184
+    },
+    "recentRatePercentPointsPerHour" : 1,
+    "recentRateSpanSeconds" : 3600,
+    "rejectedSampleCount" : 0,
+    "sampleCount" : 49,
+    "status" : "ok",
+    "syncCaughtUp" : true
+  },
+  "plan-mismatch" : {
+    "accountMatch" : "unverified",
+    "historyContractVersion" : 1,
+    "historySource" : "tokencoffee",
+    "lastSuccessfulSyncAt" : "2027-01-15T08:00:00Z",
+    "method" : "tokencoffee-e1b47ee-v3",
+    "newestStoredSampleAt" : "2027-01-15T08:00:00Z",
+    "reason" : "no_matching_history",
+    "rejectedSampleCount" : 49,
+    "sampleCount" : 0,
+    "status" : "unavailable",
+    "syncCaughtUp" : true
+  },
+  "stale" : {
+    "accountMatch" : "unverified",
+    "historyContractVersion" : 1,
+    "historySource" : "tokencoffee",
+    "historySpanSeconds" : 82800,
+    "lastSuccessfulSyncAt" : "2027-01-15T08:00:00Z",
+    "latestSampleAt" : "2027-01-15T07:00:00Z",
+    "method" : "tokencoffee-e1b47ee-v3",
+    "newestStoredSampleAt" : "2027-01-15T07:00:00Z",
+    "reason" : "no_recent_samples",
+    "rejectedSampleCount" : 0,
+    "sampleCount" : 47,
+    "status" : "stale_history",
+    "syncCaughtUp" : true
+  }
+}
