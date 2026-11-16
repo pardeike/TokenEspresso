@@ -292,6 +292,12 @@ if credentials.needsRefresh() {
 
 `profile.identity` is a stable account identifier suitable for `UsageHistoryKeys.account(provider: "claude", identity:)`.
 
+HTTP failures throw `ClaudeHTTPFailure` with the operation's `stage`, `statusCode`,
+an allowlisted OAuth `code`, and a parsed `retryAfter` date when available.
+The error retains no response body or arbitrary header text.
+Callers decide whether to request login or delay another request.
+The older `ClaudeOAuthError.httpStatus` case remains available, but the client no longer throws it.
+
 A Claude reading can carry several seven-day windows: one general and one per model. Each is a `ClaudeUsageDiagram` with its own id. Build one snapshot per diagram and keep one history per id:
 
 ```swift

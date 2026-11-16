@@ -42,8 +42,52 @@ final class ClaudeProviderTests: XCTestCase, @unchecked Sendable {
             _ = try await client.refresh(ClaudeCredentials(accessToken: "access", refreshToken: "refresh", expiresAt: .distantPast))
             XCTFail("Expected provider failure")
         } catch {
-            XCTAssertEqual(error as? ClaudeOAuthError, .httpStatus(400))
+            let failure = try XCTUnwrap(error as? ClaudeHTTPFailure)
+            XCTAssertEqual(failure.stage, .refresh)
+            XCTAssertEqual(failure.statusCode, 400)
+            XCTAssertEqual(failure.code, "invalid_grant")
             XCTAssertFalse(String(reflecting: error).contains("private-access-token"))
+        }
+    }
+
+    func testHTTPFailureStagesAndUnknownBodies() async throws {
+        for (status, body, code) in [(401, #"{"error":{"type":"authentication_error","message":"private"}}"#, "authentication_error"),
+                                      (403, #"{"error":"private-token"}"#, nil),
+                                      (503, "private non-JSON response", nil)] {
+            let http = RecordingHTTP(status: status, data: Data(body.utf8))
+            let client = ClaudeOAuthClient(configuration: ClaudeOAuthConfiguration(clientID: "caller-client"), http: http)
+            for stage in [ClaudeOAuthStage.authorizationCode, .profile, .usage] {
+                do {
+                    switch stage {
+                    case .authorizationCode:
+                        _ = try await client.complete(ClaudeAuthorization(verifier: "v", state: "s", createdAt: Date()), input: "code#s")
+                    case .profile: _ = try await client.profile(accessToken: "access")
+                    case .usage: _ = try await client.usage(accessToken: "access")
+                    case .refresh: XCTFail("Covered separately")
+                    }
+                    XCTFail("Expected HTTP failure")
+                } catch {
+                    let failure = try XCTUnwrap(error as? ClaudeHTTPFailure)
+                    XCTAssertEqual(failure.stage, stage)
+                    XCTAssertEqual(failure.statusCode, status)
+                    XCTAssertEqual(failure.code, code)
+                    XCTAssertFalse(String(reflecting: failure).contains("private"))
+                }
+            }
+        }
+        XCTAssertNil(ClaudeOAuthClient.failureCode(in: Data(repeating: 32, count: 131_073)))
+    }
+
+    func testRetryAfterAcceptsDelayOrHTTPDateWithoutRetainingHeader() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        let make: (String) -> ClaudeHTTPFailure = {
+            ClaudeHTTPFailure(stage: .usage, statusCode: 429, body: Data(), retryAfterHeader: $0, now: now)
+        }
+        XCTAssertEqual(make("120").retryAfter, now.addingTimeInterval(120))
+        XCTAssertEqual(make("Thu, 01 Jan 1970 00:20:00 GMT").retryAfter, Date(timeIntervalSince1970: 1200))
+        for header in ["-1", "nan", "inf", "private-token", "Thu, 01 Jan 1970 00:01:00 GMT"] {
+            XCTAssertNil(make(header).retryAfter)
+            XCTAssertFalse(String(reflecting: make(header)).contains(header))
         }
     }
 

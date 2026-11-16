@@ -4,7 +4,42 @@ import TokenEspresso
 
 public enum ClaudeOAuthError: Error, Equatable, Sendable {
     case invalidCode, expiredAuthorization, invalidResponse
+    // Retained for source compatibility. HTTP responses now throw ClaudeHTTPFailure.
     case httpStatus(Int)
+}
+
+public enum ClaudeOAuthStage: String, Codable, Sendable {
+    case authorizationCode, refresh, profile, usage
+}
+
+/// Safe HTTP metadata only. Provider bodies and arbitrary header values are never retained.
+public struct ClaudeHTTPFailure: Error, Equatable, Sendable {
+    public let stage: ClaudeOAuthStage
+    public let statusCode: Int
+    public let code: String?
+    public let retryAfter: Date?
+
+    public init(stage: ClaudeOAuthStage, statusCode: Int, body: Data,
+                retryAfterHeader: String? = nil, now: Date = Date()) {
+        self.stage = stage
+        self.statusCode = statusCode
+        code = ClaudeOAuthClient.failureCode(in: body)
+        retryAfter = Self.retryDate(retryAfterHeader, now: now)
+    }
+
+    private static func retryDate(_ header: String?, now: Date) -> Date? {
+        guard let header, header.utf8.count <= 128 else { return nil }
+        if let seconds = Double(header), seconds.isFinite, seconds >= 0 {
+            let date = now.addingTimeInterval(seconds)
+            return date.timeIntervalSince1970.isFinite ? date : nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        guard let date = formatter.date(from: header), date >= now else { return nil }
+        return date
+    }
 }
 
 public struct ClaudeCredentials: Equatable, Sendable {
@@ -150,49 +185,53 @@ public struct ClaudeOAuthClient: Sendable {
     public func complete(_ pending: ClaudeAuthorization, input: String, now: Date = Date()) async throws -> ClaudeCredentials {
         try await token(["grant_type": "authorization_code", "code": pending.code(from: input, now: now),
             "state": pending.state, "redirect_uri": configuration.redirectURL.absoluteString,
-            "client_id": configuration.clientID, "code_verifier": pending.verifier], now: now)
+            "client_id": configuration.clientID, "code_verifier": pending.verifier], stage: .authorizationCode, now: now)
     }
 
     public func refresh(_ credential: ClaudeCredentials, now: Date = Date()) async throws -> ClaudeCredentials {
         try await token(["grant_type": "refresh_token", "refresh_token": credential.refreshToken,
-            "client_id": configuration.clientID, "scope": "user:profile"], previous: credential.refreshToken, now: now)
+            "client_id": configuration.clientID, "scope": "user:profile"], previous: credential.refreshToken, stage: .refresh, now: now)
     }
 
     public func profile(accessToken: String) async throws -> ClaudeProfile {
-        try ClaudeProfile.decode(await resource("profile", accessToken: accessToken))
+        try ClaudeProfile.decode(await resource(.profile, accessToken: accessToken))
     }
 
     public func usage(accessToken: String) async throws -> ClaudeUsageReading {
-        try ClaudeUsageReading.decode(await resource("usage", accessToken: accessToken))
+        try ClaudeUsageReading.decode(await resource(.usage, accessToken: accessToken))
     }
 
-    private func token(_ body: [String: String], previous: String? = nil, now: Date) async throws -> ClaudeCredentials {
+    private func token(_ body: [String: String], previous: String? = nil, stage: ClaudeOAuthStage, now: Date) async throws -> ClaudeCredentials {
         var request = URLRequest(url: configuration.tokenURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
-        let data = try await response(request)
+        let data = try await response(request, stage: stage, now: now)
         return try JSONDecoder().decode(ClaudeTokenResponse.self, from: data).credentials(previousRefreshToken: previous, now: now)
     }
 
-    private func resource(_ name: String, accessToken: String) async throws -> Data {
-        var request = URLRequest(url: configuration.resourceBaseURL.appendingPathComponent(name))
+    private func resource(_ stage: ClaudeOAuthStage, accessToken: String) async throws -> Data {
+        var request = URLRequest(url: configuration.resourceBaseURL.appendingPathComponent(stage.rawValue))
         request.setValue("Bearer " + accessToken, forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(configuration.userAgent, forHTTPHeaderField: "User-Agent")
-        return try await response(request)
+        return try await response(request, stage: stage)
     }
 
-    private func response(_ request: URLRequest) async throws -> Data {
+    private func response(_ request: URLRequest, stage: ClaudeOAuthStage, now: Date = Date()) async throws -> Data {
         let (data, response) = try await http.data(for: request)
-        guard response.statusCode == 200 else { throw ClaudeOAuthError.httpStatus(response.statusCode) }
+        guard response.statusCode == 200 else {
+            throw ClaudeHTTPFailure(stage: stage, statusCode: response.statusCode, body: data,
+                retryAfterHeader: response.value(forHTTPHeaderField: "Retry-After"), now: now)
+        }
         guard data.count <= 131_072 else { throw ClaudeOAuthError.invalidResponse }
         return data
     }
 
     public static func failureCode(in data: Data) -> String? {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard data.count <= 131_072,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let code = object["error"] as? String ?? (object["error"] as? [String: Any])?["type"] as? String,
               ["invalid_grant", "invalid_request", "invalid_scope", "unauthorized_client",
                "unsupported_grant_type", "access_denied", "server_error", "temporarily_unavailable",
